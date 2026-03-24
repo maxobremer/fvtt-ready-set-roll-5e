@@ -1,3 +1,6 @@
+import { splitTypedBonusDamage } from "./typed-bonus-split.js";
+import { BonusManager } from "./bonus.js";
+import { RerollManager } from "./reroll.js";
 import { MODULE_SHORT, MODULE_TITLE } from "../module/const.js";
 import { MODULE_AA } from "../module/integration.js";
 import { ActivityUtility } from "./activity.js";
@@ -47,6 +50,9 @@ export class HooksUtility {
 
             HooksUtility.registerRollHooks();
             HooksUtility.registerChatHooks();
+            
+            // Addon: Initialize Reroll feature
+            RerollManager.registerGlobalListener();
         });
 
         Hooks.on(HOOKS_CORE.READY, () => {
@@ -60,7 +66,7 @@ export class HooksUtility {
 
             HooksUtility.registerSheetHooks();
             HooksUtility.registerIntegrationHooks();
-
+            
             LogUtility.log(`Loaded ${MODULE_TITLE}`);
         });
     }
@@ -154,8 +160,27 @@ export class HooksUtility {
     static registerChatHooks() {
         LogUtility.log("Registering chat hooks");
 
-        Hooks.on(HOOKS_DND5E.RENDER_CHAT_MESSAGE, (message, html) => {
+        // Modern V12/V13 hook for chat rendering
+        Hooks.on("renderChatMessageHTML", (message, html) => {
+            const $html = html instanceof HTMLElement ? $(html) : html;
+            
+            // RSR Core Processing
             ChatUtility.processChatMessage(message, html);
+            
+            // Addon: Typed Bonus Split
+            splitTypedBonusDamage(message, html);
+
+            // Addon: Bonus Manager Observer
+            BonusManager.init(message, $html);
+            if (html instanceof HTMLElement || html[0] instanceof HTMLElement) {
+                const element = html instanceof HTMLElement ? html : html[0];
+                const observer = new MutationObserver(() => BonusManager.init(message, $(element)));
+                observer.observe(element, { childList: true, subtree: true });
+                setTimeout(() => observer.disconnect(), 15000);
+            }
+            if ($html.find('.dice-tooltip .dice-rolls .roll.die').length > 0) {
+                $html.find('.dice-tooltip .dice-rolls .roll.die').addClass('rsr-ready');
+            }
         });
     }
 
