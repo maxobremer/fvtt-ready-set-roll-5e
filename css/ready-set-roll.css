@@ -298,3 +298,15 @@
 .rsr-bonus-window .form-group:hover {
     background: var(--color-bg-light-2) !important;
 }
+/* Ensure RSR titles have enough space for the addon buttons */
+.rsr-title {
+    position: relative;
+    padding-right: 25px; /* Creates a gutter for the button */
+}
+
+.rsr-addon-bonus-btn {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+}
