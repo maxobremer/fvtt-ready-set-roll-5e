@@ -406,7 +406,9 @@ async function _injectContent(message, type, html) {
                 await _injectApplyDamageButtons(message, html);
             }
 
+            // FIX: Remove both the extra sub-cards and the extra dice-roll containers
             html.find('.dnd5e2.chat-card').not('.activation-card').remove();
+            html.closest('.message-content').find('> .dice-roll').remove(); 
             break;
         default:
             break;
