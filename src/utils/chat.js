@@ -48,21 +48,27 @@ export class ChatUtility {
 
         const type = ChatUtility.getMessageType(message);
 
-        // Hide the message if we haven't yet finished processing RSR content
+       // Hide the message if we haven't yet finished processing RSR content
         if (!message.flags[MODULE_SHORT].processed) {
             await $(html).addClass("rsr-hide");
 
             if (type == ROLL_TYPE.ACTIVITY && message.isAuthor)
             {
+                // FIX: MUTEX LOCK to prevent AC5e from causing concurrent re-rolls
+                if (message._rsrIsProcessing) return;
+                message._rsrIsProcessing = true;
+
                 if (CoreUtility.hasModule(MODULE_MIDI)) {
                     const activityType = ChatUtility.getActivityType(message);
                     if (activityType == ROLL_TYPE.ATTACK || (activityType == ROLL_TYPE.ABILITY_SAVE && message.flags[MODULE_SHORT].renderDamage)) {
                         message.flags[MODULE_SHORT].processed = true;
                     } else {
-                        ActivityUtility.runActivityActions(message);
+                        // FIX: Added missing await
+                        await ActivityUtility.runActivityActions(message);
                     }  
                 } else {
-                    ActivityUtility.runActivityActions(message);
+                    // FIX: Added missing await
+                    await ActivityUtility.runActivityActions(message);
                 }                
             }
 
@@ -126,6 +132,10 @@ export class ChatUtility {
      */
     static async updateChatMessage(message, update = {}, context = {}) {
         if (message instanceof ChatMessage) {
+            // FIX: Ensure Rolls are serialized to JSON before sending them to Foundry's database
+            if (update.rolls && Array.isArray(update.rolls)) {
+                update.rolls = update.rolls.map(r => (r && typeof r.toJSON === "function") ? r.toJSON() : r);
+            }
             await message.update(update, context);
         }
     }
