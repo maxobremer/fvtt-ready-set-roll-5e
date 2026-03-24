@@ -24,7 +24,12 @@ export const SETTING_NAMES = {
     APPLY_DAMAGE_TO: "applyDamageTo",
     ALWAYS_ROLL_MULTIROLL: "alwaysRollMulti",
     CONFIRM_RETRO_ADV: "confirmRetroAdv",
-    CONFIRM_RETRO_CRIT: "confirmRetroCrit"
+    CONFIRM_RETRO_CRIT: "confirmRetroCrit",
+    
+    // Addon Settings
+    REROLL_EVERYONE: "rerollEveryone",
+    REROLL_PLAYERS: "rerollPlayers",
+    FUDGE_GM: "fudgeGM"
 }
 
 /**
@@ -128,6 +133,36 @@ export class SettingsUtility {
                 3: CoreUtility.localize(`${MODULE_SHORT}.choices.apply.3`),
                 4: CoreUtility.localize(`${MODULE_SHORT}.choices.apply.4`)
             }
+        });
+
+        // ==========================================
+        // ADDON SETTINGS
+        // ==========================================
+        game.settings.register(MODULE_NAME, SETTING_NAMES.REROLL_EVERYONE, {
+            name: "Enable Rerolling (Global)",
+            hint: "Master switch. If disabled, no one can reroll dice using clicking.",
+            scope: "world",
+            config: true,
+            type: Boolean,
+            default: true
+        });
+
+        game.settings.register(MODULE_NAME, SETTING_NAMES.REROLL_PLAYERS, {
+            name: "Enable Rerolling for Players",
+            hint: "If enabled, players can reroll their own dice (Left-Click).",
+            scope: "world",
+            config: true,
+            type: Boolean,
+            default: false
+        });
+
+        game.settings.register(MODULE_NAME, SETTING_NAMES.FUDGE_GM, {
+            name: "Enable Fudging for GM",
+            hint: "If enabled, the GM can Right-Click a die to manually set its result.",
+            scope: "world",
+            config: true,
+            type: Boolean,
+            default: false
         });
     }
     
