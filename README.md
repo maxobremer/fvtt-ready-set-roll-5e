@@ -49,31 +49,49 @@ The following modules have been verified as compatible from the specified module
 
 ![retroactiveoverlay](https://github.com/MangoFVTT/fvtt-ready-set-roll-5e/assets/110994627/d73efc5b-cf47-4dca-a5af-6dff9c531359)
 
-<!-- ### Individual Dice Rerolling - TEMPORARILY DISABLED IN 3.0+
-- If enabled via the module settings, individual dice rolls in quick rolls can be rerolled by clicking on that individual dice within the chat card.
-- Rerolling dice will automatically live edit the quick roll's chat card, displaying the new rolls and roll totals alongside the already existing dice.
+### Retroactive Bonus Manager
+- **Post-Roll Bonuses**: You can seamlessly add bonuses (like Bardic Inspiration, Bless, or custom numeric values) to a roll *after* it has already been made in chat.
+- **Smart Detection**: Injects a Plus (+) icon into Attack, Damage, Ability Check, Skill, and Saving Throw headers. Clicking this opens a custom dialog to select detected active effects on your actor, or input custom formulas.
+- **Consumption Logic**: Supports "Once" effects and can automatically consume item uses (e.g., ticking down a Bardic Inspiration die) when a bonus is applied.
 
-![dicereroll](https://github.com/MangoFVTT/fvtt-ready-set-roll-5e/assets/110994627/d0c16a57-e41e-49df-b88f-464b152d1658) -->
+#### How to Configure Retroactive Bonuses
+The Bonus Manager automatically detects **Active Effects** on your actor that are configured to provide a retroactive bonus. To create a compatible effect, add a change to an Active Effect with the following details:
+
+* **Attribute Key**: `flags.rsr5e-addon.bonus`
+* **Value Syntax**: `formula; type: [types]; [options]`
+
+**Syntax Breakdown**
+* **Formula**: The bonus to add (e.g., `1d4`, `+5`, or `@abilities.cha.mod`).
+* **type**: (Optional) Restrict where the bonus appears. Use `attack`, `damage`, `check`, `save`, `skill`, or `any` (default). You can list multiple separated by commas.
+* **once**: (Optional) If included, the Active Effect is deleted automatically after the bonus is used once.
+* **consume**: (Optional) Consumes a usage from an item.
+    * `consume: origin` — Consumes 1 use from the item that created the effect.
+    * `consume: [Item Name or ID]` — Consumes 1 use from a specific named item on the actor.
+
+**Examples**
+1. **Bless**: `1d4; type: attack, save`
+2. **Bardic Inspiration**: `1d8; type: attack, save, check, skill; once`
+3. **Static Tactical Bonus**: `+2; type: attack`
+
+#### How to Use in Play
+1. Perform your roll as usual using Ready Set Roll.
+2. In the Chat Card, look for the **Plus (+)** icon in the header of the roll section.
+3. Click the icon to open the **Bonus Selector**.
+4. Select one of your detected Active Effects or choose **Custom Bonus** to type in a formula.
+5. Click **Apply Bonus** to update the roll result in place.
+
+<img width="1199" height="624" alt="image" src="https://github.com/user-attachments/assets/9a53d49b-6163-43bd-a974-a282d3c0a360" />
+
+### Individual Dice Rerolling & GM Fudging
+- **Interactive Dice**: If enabled via the module settings, players can individually reroll specific dice by simply left-clicking on the die result within the chat card tooltip.
+- **GM Fudging**: GMs have the added ability to silently control fate. By right-clicking any die result within a tooltip, the GM can manually input and set it to a specific number.
+- Modifying dice will automatically recalculate the modifiers, update the totals, and live-edit the chat card to display the new results seamlessly.
 
 ### Apply Individual Damage
 - If enabled via the module settings, each damage field in a quick roll chat card can apply damage or healing to selected or targeted tokens via overlay buttons. This extends core system behaviour (applying damage via context menus) to allow for the application of each damage field individually instead of as a single whole.
 - Damage fields can be applied in a specific manner (damage or healing) regardless of the actual damage type. This is intended to allow Players or GMs to manually decide what to do with the damage field in the event of edge cases (such as a specific damage type healing instead of doing damage for a particular creature).
 
 ![damageoverlay](https://github.com/MangoFVTT/fvtt-ready-set-roll-5e/assets/110994627/f610f9be-9578-435a-abb5-bac082abe06f)
-
-<!-- ### Macro Support - TEMPORARILY DISABLED IN 3.0+
-- Module-specific macros can be called to directly create quick rolls with custom options, or to output a set of damage rolls without any attached item.
-- Macros are available in the following format:
-    - `rsr5e.macro.rollItem('item ID or name', 'actor ID or name (optional)', options = {})`
-    - `rsr5e.macro.rollDamage([['formula 1', 'damage type 1'], ['formula 2', 'damage type 2'], ...], options = {})`
-
-![macros](https://user-images.githubusercontent.com/110994627/214150998-869afaaa-b93a-4ff0-b9af-470c54f35d52.png)
-
-### String Queries - TEMPORARILY DISABLED IN 3.0+
-- Macro scripts can call `rsr5e.query()` on a Roll20 style query (e.g. `'?{Select Die Value|1d4,4|1d6,6|1d8,8}'`. 
-- This will bring up a dialog prompt parsed from that query when the macro is executed, and return the selected value for later use.
-
-![image](https://user-images.githubusercontent.com/110994627/214161613-1bb4720e-b0b4-4f85-9658-e8c44d1227c3.png) -->
 
 ## Planned Features
 - [See [FEATURE] Issues List](https://github.com/MangoFVTT/fvtt-ready-set-roll-5e/issues?q=is%3Aopen+is%3Aissue+label%3Afeature)
