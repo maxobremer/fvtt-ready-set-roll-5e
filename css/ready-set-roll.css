@@ -255,7 +255,7 @@
    ========================================== */
 
 /* Reroll Styling - Target the structure directly */
-.dice-tooltip .dice-rolls .roll.die {
+.dice-tooltip .dice-rolls .roll {
     cursor: pointer !important; /* Changed from context-menu to pointer for better UX */
     transition: all 0.2s;
     position: relative;
@@ -263,7 +263,7 @@
     pointer-events: auto !important; 
 }
 
-.dice-tooltip .dice-rolls .roll.die:hover {
+.dice-tooltip .dice-rolls .roll:hover {
     text-shadow: 0 0 5px red; /* Updated to match your JS injection style */
     transform: scale(1.2);    /* Updated scale to match your JS injection */
     color: white;             /* Updated color to match your JS injection */
@@ -271,7 +271,7 @@
     font-weight: bold;
 }
 
-.dice-tooltip .dice-rolls .roll.die.rsr-ready {
+.dice-tooltip .dice-rolls .roll.rsr-ready {
     /* Marker class to ensure styles apply if needed specifically */
 }
 
