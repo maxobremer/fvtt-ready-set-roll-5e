@@ -1,3 +1,5 @@
+import { MODULE_SHORT } from "../module/const.js";
+import { ChatUtility } from "./chat.js";
 import { RerollManager } from "./reroll.js";
 
 // Import V2 API
@@ -16,7 +18,6 @@ export class BonusManager {
                 ev.stopPropagation();
             });
 
-        // --- DETECT SECTIONS ---
         const hasAttackSection = $html.find('.rsr-section-attack').length > 0;
         const hasDamageSection = $html.find('.rsr-section-damage').length > 0;
 
@@ -83,14 +84,9 @@ export class BonusManager {
     }
 
     static async openBonusDialog(message, type) {
-        let actor = null;
-        if (message.speaker.token) {
-            const token = game.scenes.get(message.speaker.scene)?.tokens.get(message.speaker.token);
-            actor = token?.actor;
-        } else if (message.speaker.actor) {
-            actor = game.actors.get(message.speaker.actor);
-        }
-
+        // Use ChatUtility.getActorFromMessage for consistent, null-safe actor resolution
+        // that correctly handles unlinked token actors (same fix as was applied in chat.js).
+        const actor = ChatUtility.getActorFromMessage(message);
         if (!actor) return ui.notifications.warn("No actor found for this message.");
         
         const rollData = actor.getRollData();
@@ -183,11 +179,22 @@ export class BonusManager {
                 }
             }
 
-            let targetRollIndex = message.rolls.findIndex(r => type === "damage" ? r instanceof CONFIG.Dice.DamageRoll : r instanceof CONFIG.Dice.D20Roll);
-            if (targetRollIndex === -1) targetRollIndex = message.rolls.length > 0 ? 0 : -1;
+            // RSR stores rolls in message.flags[MODULE_SHORT].rolls, not in message.rolls.
+            // For a processed RSR activity card, message.rolls is empty — the attack and
+            // damage rolls were intercepted and stored in flags by runActivityActions().
+            // ChatUtility.getMessageRolls() reads the flags path first, falling back to
+            // message.rolls for non-RSR messages.
+            const currentRolls = ChatUtility.getMessageRolls(message).map(r => {
+                return r instanceof Roll ? r : Roll.fromData(r);
+            });
+
+            let targetRollIndex = currentRolls.findIndex(r =>
+                type === "damage" ? r instanceof CONFIG.Dice.DamageRoll : r instanceof CONFIG.Dice.D20Roll
+            );
+            if (targetRollIndex === -1) targetRollIndex = currentRolls.length > 0 ? 0 : -1;
             if (targetRollIndex === -1) return ui.notifications.error("No roll found.");
 
-            const originalRoll = message.rolls[targetRollIndex];
+            const originalRoll = currentRolls[targetRollIndex];
             const TargetRollClass = originalRoll.constructor;
             const rollData = actor.getRollData();
             const cleanFormula = this._resolveFormula(bonusDef.rawFormula, rollData);
@@ -208,10 +215,16 @@ export class BonusManager {
             newRoll._total = originalRoll.total + bonusRoll.total;
             newRoll._evaluated = true; 
 
-            const rolls = [...message.rolls];
-            rolls[targetRollIndex] = newRoll;
+            currentRolls[targetRollIndex] = newRoll;
 
-            await message.update({ rolls: rolls });
+            // Persist via flags so the RSR card re-renders from the correct data source.
+            const serialised = currentRolls.map(r => r.toJSON ? r.toJSON() : r);
+            if (message.flags?.[MODULE_SHORT]) {
+                message.flags[MODULE_SHORT].rolls = serialised;
+                await ChatUtility.updateChatMessage(message, { flags: message.flags });
+            } else {
+                await message.update({ rolls: serialised });
+            }
 
             if (type === "initiative") {
                 const combat = game.combats.find(c => c.scene?.id === message.speaker.scene) || game.combat;
