@@ -1,4 +1,5 @@
 import { MODULE_SHORT } from "../module/const.js";
+import { ChatUtility } from "./chat.js";
 import { ROLL_TYPE } from "./roll.js";
 import { SETTING_NAMES, SettingsUtility } from "./settings.js";
 
@@ -7,8 +8,8 @@ import { SETTING_NAMES, SettingsUtility } from "./settings.js";
  */
 export class RerollManager {
     static registerGlobalListener() {
-        // Listen for clicks on the document to catch dice result interactions
-        $(document).on("mousedown", ".dice-tooltip .dice-rolls .roll.die", (event) => {
+        // FIX: Broadened the selector from '.roll.die' to '.roll' to catch 5e damage dice templates
+        $(document).on("mousedown", ".dice-tooltip .dice-rolls .roll", (event) => {
             if (!SettingsUtility.getSettingValue(SETTING_NAMES.REROLL_EVERYONE)) return;
             
             const dieElement = $(event.currentTarget);
@@ -18,13 +19,10 @@ export class RerollManager {
 
             if (!message) return;
 
-            // Handle Right-Click (GM Fudge)
             if (event.button === 2) {
                 if (!game.user.isGM || !SettingsUtility.getSettingValue(SETTING_NAMES.FUDGE_GM)) return;
                 this._handleFudge(message, dieElement);
-            } 
-            // Handle Left-Click (Player/Author Reroll)
-            else if (event.button === 0) {
+            } else if (event.button === 0) {
                 const canReroll = game.user.isGM || 
                                  (message.isAuthor && SettingsUtility.getSettingValue(SETTING_NAMES.REROLL_PLAYERS));
                 if (!canReroll) return;
@@ -35,81 +33,97 @@ export class RerollManager {
 
     static async _handleReroll(message, dieElement) {
         const { rollIndex, termIndex, resultIndex } = this._getDiePath(dieElement);
-        const rolls = [...message.rolls];
+
+        const rolls = ChatUtility.getMessageRolls(message).map(r => {
+            return r instanceof Roll ? r : Roll.fromData(r);
+        });
+
         const targetRoll = rolls[rollIndex];
-        const targetTerm = targetRoll.terms[termIndex];
+        if (!targetRoll) {
+            console.warn(`RSR | _handleReroll: no roll at index ${rollIndex}`, rolls);
+            return;
+        }
+
+        // FIX: Map to .dice instead of .terms to align with the rendered tooltip-parts
+        const targetTerm = targetRoll.dice[termIndex];
+        if (!targetTerm) {
+            console.warn(`RSR | _handleReroll: no dice term at index ${termIndex}`, targetRoll.dice);
+            return;
+        }
         
-        // Create a new roll for just one die
         const newDieRoll = await new Roll(`1d${targetTerm.faces}`).evaluate();
         const newResult = newDieRoll.dice[0].results[0];
         
-        // Update the original result
         targetTerm.results[resultIndex].result = newResult.result;
-        
-        // Re-evaluate modifiers (Advantage/Disadvantage highlighting)
         this._recalculateModifiers(targetTerm);
-
-        // Force Foundry to re-evaluate the total
         targetRoll._total = targetRoll._evaluateTotal();
-        
-        await message.update({ rolls: rolls });
+
+        _persistRolls(message, rolls);
         ui.notifications.info(`Rerolled die: New result is ${newResult.result}`);
     }
 
     static async _handleFudge(message, dieElement) {
         const { rollIndex, termIndex, resultIndex } = this._getDiePath(dieElement);
-        
-        new Dialog({
-            title: "Fudge Die Result",
-            content: `<input type="number" id="fudge-value" placeholder="Enter new value" autofocus>`,
-            buttons: {
-                fudge: {
-                    label: "Fudge It",
-                    callback: async (html) => {
-                        const newVal = parseInt(html.find("#fudge-value").val());
-                        if (isNaN(newVal)) return;
 
-                        const rolls = [...message.rolls];
-                        const targetRoll = rolls[rollIndex];
-                        const targetTerm = targetRoll.terms[termIndex];
+        const content = `<div style="padding:4px 0">
+            <input type="number" id="fudge-value" placeholder="Enter new value" autofocus
+                   style="width:100%; text-align:center; font-size:1.2em;">
+        </div>`;
 
-                        targetTerm.results[resultIndex].result = newVal;
-                        
-                        // Re-evaluate modifiers (Advantage/Disadvantage highlighting)
-                        this._recalculateModifiers(targetTerm);
-
-                        targetRoll._total = targetRoll._evaluateTotal();
-
-                        await message.update({ rolls: rolls });
-                    }
+        const newVal = await foundry.applications.api.DialogV2.prompt({
+            window: { title: "Fudge Die Result" },
+            content,
+            ok: {
+                label: "Fudge It",
+                callback: (event, button) => {
+                    const val = parseInt(button.form.elements["fudge-value"]?.value
+                        ?? button.form.querySelector("#fudge-value")?.value);
+                    return isNaN(val) ? null : val;
                 }
             }
-        }).render(true);
+        });
+
+        if (newVal === null || newVal === undefined) return;
+
+        const rolls = ChatUtility.getMessageRolls(message).map(r => {
+            return r instanceof Roll ? r : Roll.fromData(r);
+        });
+
+        const targetRoll = rolls[rollIndex];
+        if (!targetRoll) {
+            console.warn(`RSR | _handleFudge: no roll at index ${rollIndex}`, rolls);
+            return;
+        }
+
+        // FIX: Map to .dice instead of .terms to align with the rendered tooltip-parts
+        const targetTerm = targetRoll.dice[termIndex];
+        if (!targetTerm) {
+            console.warn(`RSR | _handleFudge: no dice term at index ${termIndex}`, targetRoll.dice);
+            return;
+        }
+
+        targetTerm.results[resultIndex].result = newVal;
+        this._recalculateModifiers(targetTerm);
+        targetRoll._total = targetRoll._evaluateTotal();
+
+        _persistRolls(message, rolls);
     }
 
-    /**
-     * Resets die result states and re-runs Advantage/Disadvantage logic.
-     * @private
-     */
     static _recalculateModifiers(targetTerm) {
         if (targetTerm.modifiers.some(m => m.includes("kh") || m.includes("kl"))) {
-            // Reset states so Foundry can re-determine which to discard
             targetTerm.results.forEach(r => {
                 r.discarded = false;
                 r.active = true;
             });
-            // Foundry internal method to re-apply "Keep Highest/Lowest" logic
             targetTerm._evaluateModifiers();
         }
     }
 
     static _getDiePath(dieElement) {
-        // Find the index of the tool-tip part (e.g., separate entries for d20 and constant bonuses)
         const tooltipPart = dieElement.closest(".tooltip-part");
         const allParts = dieElement.closest(".dice-tooltip").find(".tooltip-part");
         const termIndex = allParts.index(tooltipPart);
 
-        // Find the index of the roll (usually 0 for RSR, but helps if multiple rolls exist)
         const diceRoll = dieElement.closest(".dice-roll");
         const allDiceRolls = dieElement.closest(".message-content").find(".dice-roll");
         const rollIndex = Math.max(0, allDiceRolls.index(diceRoll));
@@ -117,5 +131,16 @@ export class RerollManager {
         const resultIndex = dieElement.index();
 
         return { rollIndex, termIndex, resultIndex };
+    }
+}
+
+function _persistRolls(message, rolls) {
+    const serialised = rolls.map(r => r.toJSON ? r.toJSON() : r);
+
+    if (message.flags?.[MODULE_SHORT]) {
+        message.flags[MODULE_SHORT].rolls = serialised;
+        ChatUtility.updateChatMessage(message, { flags: message.flags });
+    } else {
+        message.update({ rolls: serialised });
     }
 }
